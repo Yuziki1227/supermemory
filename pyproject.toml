@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "supermemory"
+version = "1.0.0"
+description = "Local, attention-weighted long-term memory for Claude Code and Codex"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24"]
+license = { text = "MIT" }
+authors = [{ name = "Yuziki1227" }]
+keywords = [
+    "mcp", "memory", "claude-code", "codex", "sqlite", "fts5",
+    "retrieval", "local-first", "long-term-memory",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Utilities",
+]
+
+[project.urls]
+Homepage = "https://github.com/Yuziki1227/supermemory"
+Repository = "https://github.com/Yuziki1227/supermemory"
+Issues = "https://github.com/Yuziki1227/supermemory/issues"
+Changelog = "https://github.com/Yuziki1227/supermemory/releases"
+
+[project.scripts]
+supermemory = "supermemory.cli:main"
+
+[tool.setuptools]
+packages = ["supermemory"]
