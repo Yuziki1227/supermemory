@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -18,7 +19,7 @@ jobs:
       matrix:
         python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     env:
-      SUPERMEMORY_HOME: ${{ runner.temp }}/sm-home
+      SUPERMEMORY_HOME: ${{ github.workspace }}/.tmp-smoke
       PYTHONUTF8: "1"
     steps:
       - uses: actions/checkout@v4
@@ -44,7 +45,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 10
     env:
-      SUPERMEMORY_HOME: ${{ runner.temp }}/sm-home
+      SUPERMEMORY_HOME: ${{ github.workspace }}/.tmp-smoke
       PYTHONUTF8: "1"
     steps:
       - uses: actions/checkout@v4
