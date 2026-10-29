@@ -64,7 +64,7 @@ SuperMemory closes that loop:
 
 | Requirement | Notes |
 |---|---|
-| Python ≥ 3.10 | 3.10–3.14 are supported |
+| Python ≥ 3.10 | the test suite passes on 3.14; avoid 3.11+ only syntax |
 | `numpy` ≥ 1.24 | the only third-party runtime dependency |
 | SQLite with FTS5 | bundled with official CPython builds |
 | Claude Code and/or Codex | optional — the CLI works standalone |

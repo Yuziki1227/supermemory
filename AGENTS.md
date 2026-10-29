@@ -11,7 +11,7 @@ memory chunks in one SQLite database (WAL + FTS5), ranks recall with a hybrid
 attention score, and exposes the store over a hand-rolled MCP stdio server.
 Claude Code and Codex are the primary clients; the CLI works standalone.
 
-- Language: Python ≥ 3.10 (tested on 3.10–3.14).
+- Language: Python ≥ 3.10 (the suite passes on 3.14; avoid 3.11+ only syntax).
 - Runtime dependencies: **numpy only**. Everything else is the standard library.
 - No build step, no third-party test framework, no network in the default path.
 - User-facing CLI and hook text is Chinese today; code comments, docstrings and
