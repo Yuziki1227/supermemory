@@ -4,6 +4,7 @@
 
 **Local, attention-weighted long-term memory for Claude Code and Codex.**
 
+[![CI](https://github.com/Yuziki1227/supermemory/actions/workflows/ci.yml/badge.svg)](https://github.com/Yuziki1227/supermemory/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)
 ![MCP](https://img.shields.io/badge/MCP-stdio-6E56CF)
@@ -54,6 +55,8 @@ SuperMemory closes that loop:
   version chains, soft delete, namespace isolation and a relevance gate.
 - **Context-aware ranking.** Six features, a softmax attention distribution and
   MMR diversity selection. Every result is explainable and tunable.
+- **Measurable retrieval.** A labelled benchmark scores Recall@k, MRR and nDCG
+  and gates CI; `--explain` shows exactly why a result won.
 - **Chinese-first tokenization.** SQLite's `unicode61` tokenizer cannot search
   CJK text. SuperMemory indexes CJK unigrams and bigrams itself and splits
   `camelCase` / `snake_case` identifiers.
@@ -270,7 +273,7 @@ moment.
 |---|---|---|
 | `memory_briefing` | Call once at session start: project state + relevant memories, budgeted | `query`, `max_tokens`, `namespace` |
 | `memory_remember` | Store a fact/decision/preference/task/gotcha; auto-chunk, dedupe, hint | `content`, `kind`, `tags`, `importance`, `pinned`, `ttl_days` |
-| `memory_recall` | Hybrid retrieval; compact entries with id, title, summary, score | `query`, `limit`, `kinds`, `tags`, `max_tokens`, `format` |
+| `memory_recall` | Hybrid retrieval; compact entries with id, title, summary, score | `query`, `limit`, `kinds`, `tags`, `max_tokens`, `explain`, `format` |
 | `memory_get` | Fetch full text by id | `ids` |
 | `memory_update` | Revise; writes a new version and keeps history | `id`, `content`, `pinned`, ... |
 | `memory_forget` | Soft-delete by default; `hard=true` deletes permanently | `ids`, `hard` |
@@ -296,9 +299,11 @@ supermemory stats
 # write and read
 supermemory remember "Content" -t "Title" -k decision --tag architecture -i 0.9
 supermemory recall "how does retrieval work"
+supermemory recall "how does retrieval work" --explain
 supermemory get M12
 supermemory list --kind decision
 supermemory briefing --query "implement MCP"
+supermemory bench bench/cases.jsonl       # retrieval regression suite
 
 # revise and maintain
 supermemory update M12 --content "Corrected content"
@@ -317,6 +322,40 @@ supermemory config --set ranking.temperature=0.5
 supermemory mcp                            # run the stdio MCP server
 supermemory hook session-start             # hook entry point (reads JSON on stdin)
 ```
+
+## Retrieval quality
+
+Two tools keep ranking changes honest.
+
+### Why did this result win?
+
+`supermemory recall "query" --explain` appends the feature breakdown to each
+hit:
+
+```text
+M3 [decision 0.63] retrieval layer
+    Retrieval uses BM25 and vector scores.
+    ↳ lex 1.00 · vec 0.42 · imp 0.46 · rec 1.00 · rein 0.00 · pin 0 · score 0.626 · attn 1.0000
+```
+
+The same switch exists over MCP: `memory_recall` with `"explain": true`.
+
+### Benchmark
+
+`bench/cases.jsonl` is a self-contained corpus plus labelled queries. Each run
+seeds a temporary database and reports Recall@k, MRR, nDCG@k, negative-case
+behaviour and token cost:
+
+```bash
+python -m supermemory bench bench/cases.jsonl
+python -m supermemory bench bench/cases.jsonl --json
+python -m supermemory bench bench/cases.jsonl --fail-under-recall 0.85 --fail-under-mrr 0.75
+```
+
+CI runs the suite, so a ranking change that breaks retrieval fails the build.
+Add a case for every retrieval bug you fix; see [bench/README.md](bench/README.md)
+for the file format. Benchmarks use the built-in defaults — pass
+`--config ~/.supermemory/config.json` to measure a tuned configuration.
 
 ## Configuration
 
@@ -371,9 +410,11 @@ supermemory/
   mcp_server.py    dependency-free MCP stdio server
   cli.py           command line interface
   hooks.py         Claude Code hook entry points
+  bench.py         labelled retrieval benchmark and metrics
 install.py         installer
 run.py             single launcher for MCP / hooks / CLI
-tests/             21 tests, including a real MCP subprocess handshake
+bench/             benchmark cases and format documentation
+tests/             32 tests, including a real MCP subprocess handshake
 ```
 
 ## Design decisions
@@ -434,11 +475,13 @@ embedder, memory text is sent to the endpoint you configure.
 
 ```bash
 python -m unittest discover -s tests -v
+python -m supermemory bench bench/cases.jsonl
 python install.py --dev       # run the checkout in place
 ```
 
 No third-party test framework, no build step. Tests isolate themselves with a
-temporary `SUPERMEMORY_HOME` and never touch your real database.
+temporary `SUPERMEMORY_HOME` and never touch your real database. CI runs the
+unit suite and the retrieval benchmark on Linux (Python 3.10–3.14) and Windows.
 
 See [AGENTS.md](AGENTS.md) for the architecture, invariants and contribution
 workflow, and [CONTRIBUTING.md](CONTRIBUTING.md) for the short version.

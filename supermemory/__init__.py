@@ -6,5 +6,5 @@ Retrieval: hybrid lexical + vector + recency + importance + reinforcement,
 Transport: hand-rolled MCP stdio server, so Claude Code and Codex share one brain.
 """
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 __all__ = ["__version__"]

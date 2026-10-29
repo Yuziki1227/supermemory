@@ -87,9 +87,49 @@ def cmd_recall(args) -> int:
     if args.json:
         _json_out([item.to_dict(include_content=False) for item in results])
     else:
-        print(render_recall(results, query=query, budget=budget))
+        print(render_recall(results, query=query, budget=budget, explain=args.explain))
         if results:
             print(f"\n(完整内容: supermemory get {results[0].memory.label})")
+    return 0
+
+
+def cmd_bench(args) -> int:
+    from .bench import format_report, run_bench
+
+    report = run_bench(
+        args.cases,
+        limit=args.limit,
+        max_tokens=args.max_tokens,
+        config_path=args.config,
+        namespace=args.namespace or "bench",
+        keep=args.keep,
+    )
+    if args.json:
+        _json_out(report.to_dict())
+    else:
+        print(format_report(report))
+
+    failures: list[str] = []
+    wanted: list[str] = []
+    recall = report.metrics.get("recall_at_k")
+    if args.fail_under_recall is not None:
+        wanted.append(f"Recall≥{args.fail_under_recall:.2f}")
+        if recall is None or recall < args.fail_under_recall:
+            failures.append(
+                f"Recall@{report.limit}="
+                + ("—" if recall is None else f"{recall:.3f}")
+            )
+    mrr = report.metrics.get("mrr")
+    if args.fail_under_mrr is not None:
+        wanted.append(f"MRR≥{args.fail_under_mrr:.2f}")
+        if mrr is None or mrr < args.fail_under_mrr:
+            failures.append("MRR=" + ("—" if mrr is None else f"{mrr:.3f}"))
+    if failures:
+        print(
+            "✗ 未达到阈值: " + " · ".join(failures) + f"（要求 {' '.join(wanted)}）",
+            file=sys.stderr,
+        )
+        return 1
     return 0
 
 
@@ -339,8 +379,21 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--max-tokens", type=int, help="输出令牌预算")
     p.add_argument("--all", action="store_true", help="包含已被修订的历史版本")
     p.add_argument("--no-mmr", action="store_true", help="关闭多样性去重")
+    p.add_argument("--explain", action="store_true", help="显示每条结果的打分特征")
     p.add_argument("--json", action="store_true", help="输出 JSON")
     p.set_defaults(func=cmd_recall)
+
+    p = add("bench", help="运行检索质量评测")
+    p.add_argument("cases", nargs="?", default="bench/cases.jsonl",
+                   help="评测文件（JSONL 或 JSON），默认 bench/cases.jsonl")
+    p.add_argument("-k", "--limit", type=int, default=8, help="每次召回条数（默认 8）")
+    p.add_argument("--max-tokens", type=int, default=20000, help="召回输出预算（默认 20000）")
+    p.add_argument("--config", help="使用指定的 config.json（默认用内置默认值）")
+    p.add_argument("--keep", action="store_true", help="保留临时数据库")
+    p.add_argument("--fail-under-recall", type=float, help="Recall@k 低于此值时退出码为 1")
+    p.add_argument("--fail-under-mrr", type=float, help="MRR 低于此值时退出码为 1")
+    p.add_argument("--json", action="store_true", help="输出 JSON")
+    p.set_defaults(func=cmd_bench)
 
     p = add("get", help="读取完整记忆")
     p.add_argument("ids", nargs="+", help="记忆 ID，如 M12")

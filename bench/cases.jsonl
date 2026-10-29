@@ -1,0 +1,29 @@
+{"type": "memory", "id": "fts", "title": "中文 FTS5 的坑", "content": "SQLite 的 unicode61 分词器把整句中文当成一个 token，所以 FTS5 直接用 MATCH 检索中文会失败。", "kind": "gotcha", "tags": ["检索", "中文"], "importance": 0.8}
+{"type": "memory", "id": "bigram", "title": "自建分词器", "content": "SuperMemory 在写入和查询时使用同一个分词器：中文按单字和相邻二元组建索引。", "kind": "decision", "tags": ["检索", "分词"], "importance": 0.85}
+{"type": "memory", "id": "weights", "title": "默认权重", "content": "检索默认权重：lexical 0.36、vector 0.28、importance 0.13、recency 0.09、reinforcement 0.06、pinned 0.08。", "kind": "fact", "tags": ["排序"], "importance": 0.6}
+{"type": "memory", "id": "gate", "title": "相关性门槛", "content": "召回结果必须命中词法索引，或余弦相似度不低于 0.15，否则会被淘汰。", "kind": "decision", "tags": ["检索"], "importance": 0.8}
+{"type": "memory", "id": "mmr", "title": "MMR 去重", "content": "最终选择使用 MMR 最大边际相关，避免 top-k 全是近似重复的记忆。", "kind": "decision", "tags": ["排序"], "importance": 0.7}
+{"type": "memory", "id": "version", "title": "版本链", "content": "memory_update 写入新行并把旧行标记为 superseded_by，历史版本永远不会被覆盖。", "kind": "fact", "tags": ["版本"], "importance": 0.8}
+{"type": "memory", "id": "dedupe", "title": "去重策略", "content": "完全相同的内容会按 namespace、kind 和内容哈希去重；相似度 0.90 以上只提示，不自动合并。", "kind": "decision", "tags": ["去重"], "importance": 0.75}
+{"type": "memory", "id": "hooks", "title": "压缩后重新注入", "content": "SessionStart 钩子在上下文压缩后也会触发（source=compact），用于重新注入简报。", "kind": "fact", "tags": ["钩子"], "importance": 0.8}
+{"type": "memory", "id": "precompact", "title": "PreCompact 的限制", "content": "PreCompact 钩子不能注入上下文，只能向 stdout 打印纯文本提醒。", "kind": "gotcha", "tags": ["钩子"], "importance": 0.7}
+{"type": "memory", "id": "installer", "title": "安装器备份", "content": "安装器会先把被修改的配置文件备份到 ~/.supermemory/backups/，并且可以重复运行。", "kind": "procedure", "tags": ["安装"], "importance": 0.6}
+{"type": "memory", "id": "embed", "title": "默认嵌入", "content": "默认嵌入是离线 blake2b 哈希向量，1024 维；也可以切换到 OpenAI 兼容接口。", "kind": "fact", "tags": ["嵌入"], "importance": 0.7}
+{"type": "memory", "id": "namespace", "title": "命名空间", "content": "默认命名空间取当前项目目录名，召回时同时搜索项目命名空间和 global。", "kind": "fact", "tags": ["命名空间"], "importance": 0.65}
+{"type": "memory", "id": "wal", "title": "并发写入", "content": "数据库开启 WAL 模式和 30 秒 busy timeout，MCP 服务器、钩子和 CLI 可以安全共享同一个文件。", "kind": "fact", "tags": ["并发"], "importance": 0.65}
+{"type": "memory", "id": "export", "title": "跨机器迁移", "content": "Export files use the supermemory-export format and can be re-imported on another machine.", "kind": "fact", "tags": ["export", "migration"], "importance": 0.5}
+{"type": "memory", "id": "codex", "title": "Codex 的注入缺口", "content": "Claude Code 使用 SessionStart 钩子注入简报；Codex 没有等价钩子，需要自己调用 memory_briefing。", "kind": "gotcha", "tags": ["codex", "钩子"], "importance": 0.75}
+{"type": "query", "query": "中文检索为什么总是失败", "expect": ["fts", "bigram"], "note": "分词器与 FTS5"}
+{"type": "query", "query": "BM25 和向量的权重是多少", "expect": ["weights"]}
+{"type": "query", "query": "怎么避免召回无关记忆", "expect": ["gate"]}
+{"type": "query", "query": "召回结果重复度太高怎么办", "expect": ["mmr"]}
+{"type": "query", "query": "相同内容会被重复写入吗", "expect": ["dedupe"]}
+{"type": "query", "query": "修改记忆会覆盖旧内容吗", "expect": ["version"]}
+{"type": "query", "query": "上下文压缩后记忆还会自动出现吗", "expect": ["hooks"]}
+{"type": "query", "query": "安装之前会备份配置文件吗", "expect": ["installer"]}
+{"type": "query", "query": "How do I move memories to another machine?", "expect": ["export"]}
+{"type": "query", "query": "多个进程同时写数据库安全吗", "expect": ["wal"]}
+{"type": "query", "query": "Codex 会自动收到记忆简报吗", "expect": ["codex"]}
+{"type": "query", "query": "默认使用什么嵌入模型", "expect": ["embed"]}
+{"type": "query", "query": "今天晚饭吃什么", "expect": [], "note": "负例：无关生活话题"}
+{"type": "query", "query": "JavaScript 的闭包是什么", "expect": [], "note": "负例：无关技术话题"}

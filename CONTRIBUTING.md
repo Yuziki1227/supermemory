@@ -49,6 +49,15 @@ deduplication, namespace isolation, token budgets, briefing, export/import and a
 real MCP subprocess handshake. Tests point `SUPERMEMORY_HOME` at a temporary
 directory, so they never touch your real memory database.
 
+Retrieval changes also need the benchmark:
+
+```bash
+python -m supermemory bench bench/cases.jsonl --fail-under-recall 0.85 --fail-under-mrr 0.75
+```
+
+Add a case to `bench/cases.jsonl` for every retrieval bug you fix; the file
+format and metric definitions are in [`bench/README.md`](bench/README.md).
+
 Before opening a pull request, also run:
 
 ```bash

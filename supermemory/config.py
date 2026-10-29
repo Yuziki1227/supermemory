@@ -162,6 +162,21 @@ def load_config(reload: bool = False) -> dict:
     return merged
 
 
+def load_config_file(path: str | Path) -> dict:
+    """Load a config file merged over ``DEFAULT_CONFIG``.
+
+    Unlike :func:`load_config`, this ignores environment overrides and the
+    default home directory, so offline tools (the benchmark) get a reproducible
+    configuration.
+    """
+    target = Path(path).expanduser()
+    try:
+        override = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise ValueError(f"cannot read config {target}: {exc}") from exc
+    return _deep_merge(DEFAULT_CONFIG, override if isinstance(override, dict) else {})
+
+
 def save_config(config: dict) -> None:
     path = config_path()
     path.write_text(

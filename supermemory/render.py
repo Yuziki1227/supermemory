@@ -13,7 +13,28 @@ def _date(ts: float | None) -> str:
     return time.strftime("%Y-%m-%d", time.localtime(ts))
 
 
-def render_recall(results: list, query: str = "", budget: int | None = None) -> str:
+def _explain_line(item) -> str:
+    """One-line decomposition of the attention score for a recall result."""
+    features = getattr(item, "features", None) or {}
+    pin = 1 if features.get("pinned") else 0
+    return (
+        "    ↳ "
+        f"lex {features.get('lexical', 0.0):.2f} · "
+        f"vec {features.get('vector', 0.0):.2f} · "
+        f"imp {features.get('importance', 0.0):.2f} · "
+        f"rec {features.get('recency', 0.0):.2f} · "
+        f"rein {features.get('reinforcement', 0.0):.2f} · "
+        f"pin {pin} · score {getattr(item, 'score', 0.0):.3f} · "
+        f"attn {getattr(item, 'attention', 0.0):.4f}"
+    )
+
+
+def render_recall(
+    results: list,
+    query: str = "",
+    budget: int | None = None,
+    explain: bool = False,
+) -> str:
     if not results:
         suffix = f'（查询: "{query}"）' if query else ""
         return f"没有命中记忆{suffix}。可以用 memory_remember 记录新信息。"
@@ -45,6 +66,10 @@ def render_recall(results: list, query: str = "", budget: int | None = None) -> 
         body = " ".join(body.split())
         lines.append(f"    {body}")
         used += estimate_tokens(body) + 24
+        if explain:
+            line = _explain_line(item)
+            lines.append(line)
+            used += estimate_tokens(line)
         if budget and used >= budget:
             lines.append("    …（已达令牌预算，剩余结果省略）")
             break

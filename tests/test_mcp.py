@@ -82,11 +82,24 @@ class TestMcpServer(unittest.TestCase):
 
     def test_tools_list(self):
         response = self.session.send("tools/list")
-        names = {tool["name"] for tool in response["result"]["tools"]}
+        tools = {tool["name"]: tool for tool in response["result"]["tools"]}
         self.assertTrue({
             "memory_remember", "memory_recall", "memory_get", "memory_update",
             "memory_forget", "memory_link", "memory_briefing", "memory_stats",
-        } <= names)
+        } <= set(tools))
+        recall_schema = tools["memory_recall"]["inputSchema"]["properties"]
+        self.assertIn("explain", recall_schema)
+
+    def test_recall_explain(self):
+        self.session.call(
+            "memory_remember", {"content": "解释模式应该展示打分特征。", "title": "解释"}
+        )
+        text, error = self.session.call(
+            "memory_recall", {"query": "解释模式", "explain": True, "limit": 2}
+        )
+        self.assertFalse(error)
+        self.assertIn("lex", text)
+        self.assertIn("score", text)
 
     def test_remember_recall_get_cycle(self):
         text, error = self.session.call(

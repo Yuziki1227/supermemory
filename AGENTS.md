@@ -20,7 +20,8 @@ Claude Code and Codex are the primary clients; the CLI works standalone.
 ## First commands
 
 ```bash
-python -m unittest discover -s tests -v    # 21 tests, includes a real MCP subprocess
+python -m unittest discover -s tests -v    # 32 tests, includes a real MCP subprocess
+python -m supermemory bench bench/cases.jsonl  # retrieval regression suite
 python -m supermemory doctor               # environment + FTS5 + numpy + DB health
 python install.py --dry-run                # inspect installer changes without writing
 python run.py mcp                          # run the MCP server by hand (JSON-RPC on stdio)
@@ -47,10 +48,13 @@ SUPERMEMORY_HOME=/tmp/sm-test python -m supermemory remember "hello" -t test
 | `supermemory/mcp_server.py` | JSON-RPC 2.0 over stdio, tool schemas, handlers, `initialize` instructions |
 | `supermemory/cli.py` | `argparse` CLI; `mcp` and `hook` entry points |
 | `supermemory/hooks.py` | `SessionStart` / `PreCompact` / `SessionEnd` handlers for Claude Code |
+| `supermemory/bench.py` | Self-contained retrieval benchmark: loads labelled cases, seeds a temp store, computes Recall@k / MRR / nDCG and token cost |
+| `bench/` | `cases.jsonl` regression corpus and the benchmark file-format documentation |
 | `install.py` | Idempotent installer: copy app, register MCP, install hooks, instructions block, doctor |
 | `run.py` | Single launcher used by MCP clients and hooks; fixes `sys.path` |
-| `tests/test_core.py` | Text, store, versioning, dedupe, namespace, budget, briefing, export tests |
+| `tests/test_core.py` | Text, store, versioning, dedupe, namespace, budget, briefing, export, explain tests |
 | `tests/test_mcp.py` | Spawns `run.py mcp` and speaks real JSON-RPC to it |
+| `tests/test_bench.py` | Metric maths, case-file validation, end-to-end benchmark and threshold exit codes |
 
 ## Non-negotiable invariants
 
@@ -144,6 +148,20 @@ CLI does this).
 3. Document it in both READMEs' configuration sections.
 4. If it changes ranking or recall behaviour, add a regression test.
 
+### Change ranking or tokenization
+
+Ranking and tokenizer changes are behaviour changes, not refactors:
+
+1. Add or update cases in `bench/cases.jsonl` — including at least one negative
+   query when the change affects the relevance gate.
+2. Put the before/after `python -m supermemory bench bench/cases.jsonl` numbers
+   in the PR description.
+3. The CI thresholds live in `.github/workflows/ci.yml`. Raise them when the
+   suite improves; do not lower them just to make a change pass.
+4. `--explain` output is part of the debugging contract. Keep the feature names
+   stable (`lex`, `vec`, `imp`, `rec`, `rein`, `pin`) and keep the numbers
+   faithful to `ranking.py`.
+
 ### Schema change
 
 `SCHEMA_VERSION` is currently `1`. A schema change needs:
@@ -168,6 +186,8 @@ CLI does this).
 ## Testing expectations
 
 - Run the full suite before finishing: `python -m unittest discover -s tests -v`.
+- Run the benchmark before finishing any ranking/tokenizer change:
+  `python -m supermemory bench bench/cases.jsonl --fail-under-recall 0.85 --fail-under-mrr 0.75`.
 - New behaviour needs a test. Bugs get a regression test that fails before the
   fix.
 - Ranking changes: assert on ordering or relevance gate behaviour, not exact
@@ -189,7 +209,7 @@ CLI does this).
 
 ## Release checklist
 
-1. `python -m unittest discover -s tests -v` passes.
+1. `python -m unittest discover -s tests -v` passes and the benchmark is green.
 2. `python install.py --dry-run` shows only intended changes.
 3. `python -m supermemory doctor` passes on a clean `SUPERMEMORY_HOME`.
 4. Both READMEs updated; `AGENTS.md` still matches the code.

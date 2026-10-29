@@ -4,6 +4,7 @@
 
 **给 Claude Code 和 Codex 共用的本地长期记忆。**
 
+[![CI](https://github.com/Yuziki1227/supermemory/actions/workflows/ci.yml/badge.svg)](https://github.com/Yuziki1227/supermemory/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)
 ![MCP](https://img.shields.io/badge/MCP-stdio-6E56CF)
@@ -45,6 +46,7 @@ SuperMemory 把这条链路补上：
 - **两个 agent 共用一个大脑**：MCP stdio 服务器由 Claude Code 和 Codex 共享，其他 MCP 客户端也能接。
 - **写入不会越积越乱**：精确去重、相似提示、不可变版本链、软删除、命名空间隔离、相关性门槛。
 - **检索可解释、可调参**：六个特征加权 + softmax 注意力分布 + MMR 多样性。
+- **检索质量可度量**：带标注的评测集计算 Recall@k、MRR、nDCG 并进入 CI；`--explain` 直接展示每条结果的打分来源。
 - **中文优先分词**：SQLite 自带 tokenizer 检索不了中文，这里自建 CJK 单字 + 二元组索引，并拆开 `camelCase` / `snake_case` 标识符。
 - **永不阻断会话**：钩子任何异常只写 stderr 并返回 0。记忆系统坏了，不影响正常写代码。
 
@@ -241,7 +243,7 @@ python -m supermemory reembed
 |---|---|---|
 | `memory_briefing` | 会话开始时调一次：项目状态 + 相关记忆，按预算裁剪 | `query`、`max_tokens`、`namespace` |
 | `memory_remember` | 写入事实/决策/偏好/任务/坑，自动分块、去重、相似提示 | `content`、`kind`、`tags`、`importance`、`pinned`、`ttl_days` |
-| `memory_recall` | 混合检索，返回 id、标题、摘要、分数的紧凑条目 | `query`、`limit`、`kinds`、`tags`、`max_tokens`、`format` |
+| `memory_recall` | 混合检索，返回 id、标题、摘要、分数的紧凑条目 | `query`、`limit`、`kinds`、`tags`、`max_tokens`、`explain`、`format` |
 | `memory_get` | 按 id 取全文 | `ids` |
 | `memory_update` | 修订，写新版本并保留历史 | `id`、`content`、`pinned` 等 |
 | `memory_forget` | 默认软删除；`hard=true` 永久删除 | `ids`、`hard` |
@@ -267,9 +269,11 @@ supermemory stats
 # 写入与读取
 supermemory remember "内容" -t "标题" -k decision --tag 架构 -i 0.9
 supermemory recall "检索怎么做的"
+supermemory recall "检索怎么做的" --explain
 supermemory get M12
 supermemory list --kind decision
 supermemory briefing --query "实现 MCP"
+supermemory bench bench/cases.jsonl       # 检索回归评测
 
 # 修订与维护
 supermemory update M12 --content "修正后的内容"
@@ -288,6 +292,38 @@ supermemory config --set ranking.temperature=0.5
 supermemory mcp                            # 运行 stdio MCP 服务器
 supermemory hook session-start             # 钩子入口（从 stdin 读 JSON）
 ```
+
+## 检索质量
+
+两个工具让排序改动有据可依。
+
+### 为什么这条排第一？
+
+`supermemory recall "查询" --explain` 会在每条结果下追加打分分解：
+
+```text
+M3 [decision 0.63] 检索层
+    检索层使用 BM25 与向量混合打分。
+    ↳ lex 1.00 · vec 0.42 · imp 0.46 · rec 1.00 · rein 0.00 · pin 0 · score 0.626 · attn 1.0000
+```
+
+MCP 侧对应参数是 `memory_recall` 的 `"explain": true`。这几个特征就是
+`ranking.py` 里加权求和的那六个，不存在"模型暗中决定"的部分。
+
+### 评测集
+
+`bench/cases.jsonl` 是自包含的语料 + 标注查询。每次运行会建一个临时数据库，
+输出 Recall@k、MRR、nDCG@k、负例表现和令牌成本：
+
+```bash
+python -m supermemory bench bench/cases.jsonl
+python -m supermemory bench bench/cases.jsonl --json
+python -m supermemory bench bench/cases.jsonl --fail-under-recall 0.85 --fail-under-mrr 0.75
+```
+
+CI 会跑这套评测，排序改动导致召回退化会直接让构建失败。每修一个检索 bug
+就补一条 case；文件格式见 [bench/README.md](bench/README.md)。评测默认使用内置
+默认配置，想测调过的配置就加 `--config ~/.supermemory/config.json`。
 
 ## 配置
 
@@ -340,9 +376,11 @@ supermemory/
   mcp_server.py   零依赖 MCP stdio 服务器
   cli.py          命令行
   hooks.py        Claude Code 钩子
+  bench.py        带标注的检索评测与指标
 install.py        安装器
 run.py            统一启动入口（MCP / 钩子 / CLI）
-tests/            21 个测试，含真实 MCP 子进程握手
+bench/            评测用例与格式说明
+tests/            32 个测试，含真实 MCP 子进程握手
 ```
 
 ## 设计取舍
@@ -397,11 +435,13 @@ echo '{"source":"startup","cwd":"/path/to/project"}' | python -m supermemory hoo
 
 ```bash
 python -m unittest discover -s tests -v
+python -m supermemory bench bench/cases.jsonl
 python install.py --dev       # 直接用仓库，不复制
 ```
 
 没有第三方测试框架，没有构建步骤。测试通过临时 `SUPERMEMORY_HOME` 隔离，不会
-碰你的真实记忆库。
+碰你的真实记忆库。CI 在 Linux（Python 3.10–3.14）和 Windows 上同时运行单元测试
+与检索评测。
 
 架构、不可破坏的约定和贡献流程见 [AGENTS.md](AGENTS.md)；快速上手见
 [CONTRIBUTING.md](CONTRIBUTING.md)。

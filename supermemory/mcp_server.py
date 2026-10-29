@@ -112,6 +112,8 @@ TOOLS: list[dict] = [
                 "namespace": {"type": "string", "description": "Default: current project + global. '*' searches everything."},
                 "include_superseded": {"type": "boolean", "default": False,
                                        "description": "Include memory versions that have been superseded."},
+                "explain": {"type": "boolean", "default": False,
+                            "description": "Append the per-feature score breakdown (lexical, vector, importance, recency, reinforcement, pinned) to each result."},
                 "format": {"type": "string", "enum": ["text", "json"], "default": "text"},
             },
             "required": [],
@@ -308,7 +310,12 @@ def _tool_recall(store: MemoryStore, args: dict) -> str:
             ensure_ascii=False, indent=2,
         )
     budget = _as_int(args.get("max_tokens")) or store.config["recall"].get("max_tokens")
-    return render_recall(results, query=str(args.get("query") or ""), budget=budget)
+    return render_recall(
+        results,
+        query=str(args.get("query") or ""),
+        budget=budget,
+        explain=_as_bool(args.get("explain")),
+    )
 
 
 def _tool_get(store: MemoryStore, args: dict) -> str:

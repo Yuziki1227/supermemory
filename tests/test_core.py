@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT))
 
 from supermemory import config as config_mod  # noqa: E402
 from supermemory.core import MemoryStore  # noqa: E402
+from supermemory.render import render_recall  # noqa: E402
 from supermemory.text import chunk_text, estimate_tokens, tokenize  # noqa: E402
 
 
@@ -73,6 +74,15 @@ class TestStore(IsolatedStore):
         hits = self.store.recall("检索怎么打分", limit=3)
         self.assertTrue(hits)
         self.assertEqual(hits[0].memory.title, "检索层选型")
+
+    def test_recall_explain_shows_feature_breakdown(self):
+        self.store.remember("检索层采用混合打分。", title="检索层")
+        hits = self.store.recall("检索怎么打分", limit=3)
+        text = render_recall(hits, query="检索怎么打分", explain=True)
+        self.assertIn("↳", text)
+        self.assertIn("lex", text)
+        self.assertIn("score", text)
+        self.assertIn("attn", text)
 
     def test_unrelated_query_returns_nothing(self):
         self.store.remember("SQLite 开启 WAL 模式以支持并发读写。", title="WAL")
